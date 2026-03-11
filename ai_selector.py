@@ -211,23 +211,29 @@ section[data-testid="stMain"] > div { padding-top: 0; }
 .tag-nocn     { background: #FEF0F0; color: #C0392B; border: 1px solid #F5C6C6; }
 .tag-partial  { background: #FFF9EC; color: #A0660A; border: 1px solid #FBDFA0; }
 
-/* 投票条 */
-.vote-bar-wrap { margin-bottom: 6px; }
-.vote-label {
-    font-size: 0.72rem; color: #C0BAB0; margin-bottom: 6px;
-    display: flex; justify-content: space-between; align-items: center;
+/* 语音麦克风按钮 */
+.mic-btn {
+    background: #1A1A1A; color: #fff;
+    border: none; border-radius: 50%;
+    width: 40px; height: 40px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; flex-shrink: 0;
+    transition: all 0.2s;
+    font-size: 1rem;
 }
-.vote-track {
-    height: 6px; border-radius: 6px;
-    background: #F0EDE8; overflow: hidden; display: flex;
+.mic-btn:hover { background: #333; transform: scale(1.05); }
+.mic-btn.recording {
+    background: #EF5350;
+    animation: pulse 1s infinite;
 }
-.vote-green { background: #4CAF50; }
-.vote-red   { background: #EF5350; }
-.vote-pct   {
-    display: flex; justify-content: space-between;
-    font-size: 0.7rem; color: #C0BAB0; margin-top: 4px;
+@keyframes pulse {
+    0%,100% { box-shadow: 0 0 0 0 rgba(239,83,80,0.4); }
+    50%      { box-shadow: 0 0 0 8px rgba(239,83,80,0); }
 }
-.vote-count { font-size: 0.68rem; color: #D0CCC4; text-align: right; margin-top: 2px; }
+.mic-status {
+    text-align: center; font-size: 0.75rem; color: #C0BAB0;
+    margin-top: 6px; height: 18px;
+}
 
 /* 真香/避雷详情 */
 .scenario-block { padding: 4px 0 8px; }
@@ -244,12 +250,7 @@ section[data-testid="stMain"] > div { padding-top: 0; }
     font-size: 0.95rem; line-height: 2;
 }
 
-/* 已投票 badge */
-.voted-badge {
-    font-size: 0.65rem; background: #F0EDE6; color: #999;
-    border-radius: 8px; padding: 2px 8px; margin-left: 6px;
-    font-style: normal;
-}
+
 
 /* 结果小标题 */
 .result-heading {
@@ -590,64 +591,26 @@ def render_tags(p: dict) -> str:
     cl, cc = CN_MAP[p["cn_friendly"]]
     return f'<div class="tag-row"><span class="tag {dc}">{dl}</span><span class="tag {pc}">{pl}</span><span class="tag {cc}">{cl}</span></div>'
 
-def render_vote_bar(green: int, red: int, total: int) -> str:
-    g_pct = round(green / total * 100) if total > 0 else 50
-    r_pct = 100 - g_pct
-    return f"""
-    <div class="vote-bar-wrap">
-        <div class="vote-label">
-            <span>红绿灯投票</span>
-            <span style="color:#D0CCC4;font-size:0.68rem;">{total} 票</span>
-        </div>
-        <div class="vote-track">
-            <div class="vote-green" style="width:{g_pct}%"></div>
-            <div class="vote-red"   style="width:{r_pct}%"></div>
-        </div>
-        <div class="vote-pct"><span>👍 {g_pct}%</span><span>{r_pct}% 👎</span></div>
-    </div>"""
-
 def render_scenario(p: dict) -> str:
     good = "".join(f'<div class="scenario-item">· {x}</div>' for x in p["good"])
     bad  = "".join(f'<div class="scenario-item">· {x}</div>' for x in p["bad"])
     return f'<div class="scenario-block"><div class="scenario-good">👍 真香：这些情况超好用</div>{good}<div class="scenario-bad">👎 避雷：这些情况别选它</div>{bad}</div>'
 
 def render_product_card(p: dict):
-    pid = p["id"]
-    green, red, total = get_vote_stats(pid)
-    already_voted = pid in st.session_state.get("voted_products", set())
-    voted_badge = '<span class="voted-badge">✓ 已投</span>' if already_voted else ""
-
-    # 引言句：取 tagline 的后半段作为卡片引语
-    quote = p["tagline"]
-
     st.markdown(f"""
     <div class="card">
         <div class="card-top">
             <div class="card-avatar">{p['emoji']}</div>
             <div class="card-meta">
-                <div class="card-name">{p['name']}{voted_badge}</div>
-                <div class="card-quote">"{quote}"</div>
+                <div class="card-name">{p['name']}</div>
+                <div class="card-quote">"{p['tagline']}"</div>
             </div>
         </div>
         <div class="card-desc">{p['desc']}</div>
         {render_tags(p)}
-        {render_vote_bar(green, red, total)}
     </div>""", unsafe_allow_html=True)
 
-    if not already_voted:
-        vc1, vc2, vc3 = st.columns([1, 1, 3])
-        with vc1:
-            if st.button("👍 真香", key=f"g_{pid}", use_container_width=True):
-                if cast_vote(pid, "green"):
-                    st.rerun()
-        with vc2:
-            if st.button("👎 避雷", key=f"r_{pid}", use_container_width=True):
-                if cast_vote(pid, "red"):
-                    st.rerun()
-    else:
-        st.caption("✅ 已记录，感谢投票")
-
-    with st.expander(f"收起对比  ↕  {p['name']}"):
+    with st.expander(f"📖 真香 vs 避雷 — {p['name']}"):
         st.markdown(render_scenario(p), unsafe_allow_html=True)
 
     st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
@@ -658,43 +621,8 @@ def render_product_card(p: dict):
 # ──────────────────────────────────────────────
 if "selected_modal" not in st.session_state:
     st.session_state.selected_modal = None
-if "votes_db" not in st.session_state:
-    st.session_state.votes_db = load_votes()
-if "voted_products" not in st.session_state:
-    st.session_state.voted_products = set()
-
-
-# ──────────────────────────────────────────────
-# 侧边栏：实时口碑榜
-# ──────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### 🏆 实时口碑排行榜")
-    st.caption("真实用户投票 · 每人每款投一次")
-    st.divider()
-
-    ranking = []
-    for p in PRODUCTS:
-        g, r, t = get_vote_stats(p["id"])
-        pct = round(g / t * 100) if t > 0 else 50
-        ranking.append((p["name"], p["emoji"], pct, t, p["modal"]))
-    ranking.sort(key=lambda x: x[2], reverse=True)
-
-    for rank, (name, emoji, pct, total, modal) in enumerate(ranking, 1):
-        medal = "🥇" if rank == 1 else "🥈" if rank == 2 else "🥉" if rank == 3 else f"**{rank}.**"
-        st.markdown(
-            f"{medal} {emoji} **{name}**  \n"
-            f"<span style='font-size:0.78rem;color:#aaa;'>{modal} · 👍{pct}% · {total}票</span>",
-            unsafe_allow_html=True,
-        )
-        st.progress(pct / 100)
-
-    st.divider()
-    total_votes = sum(
-        st.session_state["votes_db"].get(p["id"], {}).get("green", 0) +
-        st.session_state["votes_db"].get(p["id"], {}).get("red", 0)
-        for p in PRODUCTS
-    )
-    st.caption(f"📊 累计收到真实投票：{total_votes} 票")
+if "voice_text" not in st.session_state:
+    st.session_state.voice_text = ""
 
 
 # ──────────────────────────────────────────────
@@ -709,85 +637,175 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ── 第一步：模态卡片（纯 HTML，手机友好）──
-MODAL_ICONS = {
-    "文字": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h13"/></svg>""",
-    "图片": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>""",
-    "音频": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>""",
-    "视频": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="m17 10 5-3v10l-5-3"/></svg>""",
-    "综合": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="9" height="9" rx="1.5"/><rect x="13" y="2" width="9" height="9" rx="1.5"/><rect x="2" y="13" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="9" height="9" rx="1.5"/></svg>""",
-}
-
-modal_items_html = ""
-for label, svg in MODAL_ICONS.items():
-    is_active = st.session_state.selected_modal == label
-    active_cls = "active" if is_active else ""
-    modal_items_html += f"""
-    <div class="modal-item {active_cls}" onclick="
-        var inputs = window.parent.document.querySelectorAll('input[type=text]');
-    ">
-        <div class="modal-icon-svg">{svg}</div>
-        <div class="modal-lbl">{label}</div>
-    </div>"""
-
-# 用 Streamlit 按钮实现点击（HTML 版仅视觉）
+# ── 第一步：五类模态卡片（只显示文字，无图标无描述）──
+MODALS = ["文字", "图片", "音频", "视频", "综合"]
 cols = st.columns(5, gap="small")
-MODALS = list(MODAL_ICONS.keys())
 for i, label in enumerate(MODALS):
     with cols[i]:
         is_active = st.session_state.selected_modal == label
-        svg = MODAL_ICONS[label]
         btn_html = f"""
         <div style="
             background:{'#1A1A1A' if is_active else '#FFFFFF'};
             border:1.5px solid {'#1A1A1A' if is_active else '#E8E4DC'};
-            border-radius:16px; padding:16px 6px 12px;
-            display:flex; flex-direction:column; align-items:center; gap:7px;
-            cursor:pointer; transition:all 0.15s;
+            border-radius:14px;
+            padding:14px 4px;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer;
         ">
-            <div style="width:26px;height:26px;{'filter:invert(1);' if is_active else 'opacity:0.6;'}">{svg}</div>
-            <div style="font-size:0.75rem;color:{'#FFFFFF' if is_active else '#666'};font-weight:500;">{label}</div>
+            <span style="font-size:0.88rem;font-weight:600;color:{'#FFFFFF' if is_active else '#333'};">
+                {label}
+            </span>
         </div>"""
         st.markdown(btn_html, unsafe_allow_html=True)
-        # 隐藏原生按钮文字，只用来捕获点击
-        if st.button("　", key=f"modal_{label}", use_container_width=True,
-                     help=f"筛选{label}类 AI 工具"):
+        if st.button("　", key=f"modal_{label}", use_container_width=True):
             st.session_state.selected_modal = label if not is_active else None
             st.rerun()
 
-# 隐藏原生按钮的视觉，只保留点击区域
+# 隐藏原生按钮视觉，只保留点击区域
 st.markdown("""
 <style>
-/* 把每个模态列的原生按钮叠在 HTML card 上，透明不可见 */
 div[data-testid="column"] button {
-    position: relative; margin-top: -70px;
-    opacity: 0; height: 70px; width: 100%;
+    position: relative; margin-top: -48px;
+    opacity: 0; height: 48px; width: 100%;
     cursor: pointer !important;
 }
 </style>""", unsafe_allow_html=True)
 
 if st.session_state.selected_modal:
     st.markdown(
-        f'<div style="text-align:center;font-size:0.8rem;color:#888;margin:8px 0 16px;">'
-        f'已选择 · <b>{st.session_state.selected_modal}</b> · 可继续描述，或直接查看推荐</div>',
+        f'<div style="text-align:center;font-size:0.78rem;color:#AAA;margin:10px 0 18px;">'
+        f'已选择 · <b style="color:#555">{st.session_state.selected_modal}</b></div>',
         unsafe_allow_html=True
     )
 
-st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='height:16px'></div>", unsafe_allow_html=True)
 
-# ── 第二步：搜索框 ──
-user_query = st.text_input(
+# ── 第二步：搜索框 + 语音开麦按钮 ──
+# 语音搜索通过 JS Web Speech API 实现，结果写回 st.query_params 触发 rerun
+st.markdown("""
+<div style="
+    background:#FFFFFF; border:1.5px solid #E8E4DC; border-radius:50px;
+    display:flex; align-items:center; padding:4px 8px 4px 20px;
+    box-shadow:0 2px 12px rgba(0,0,0,0.04); gap:8px;
+">
+    <span style="font-size:1rem;opacity:0.35;">🔍</span>
+    <div id="search-display" style="
+        flex:1; font-size:0.95rem; color:#1A1A1A; padding:10px 0;
+        min-height:42px; line-height:1.5; cursor:text;
+        font-family:'Noto Sans SC','PingFang SC',sans-serif;
+    " onclick="document.getElementById('real-input').focus()">
+        <span id="search-placeholder" style="color:#C0BAB0;">用大白话描述你想解决的问题...</span>
+    </div>
+    <button id="mic-btn" class="mic-btn" onclick="toggleMic()" title="开麦语音输入">🎙️</button>
+</div>
+<div class="mic-status" id="mic-status"></div>
+
+<script>
+let recognition = null;
+let isRecording = false;
+let currentText = "";
+
+function toggleMic() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        document.getElementById('mic-status').textContent = '⚠️ 当前浏览器不支持语音，请用 Chrome';
+        return;
+    }
+    if (isRecording) {
+        stopMic();
+    } else {
+        startMic();
+    }
+}
+
+function startMic() {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SR();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = false;
+    recognition.interimResults = true;
+
+    recognition.onstart = () => {
+        isRecording = true;
+        document.getElementById('mic-btn').classList.add('recording');
+        document.getElementById('mic-btn').textContent = '⏹️';
+        document.getElementById('mic-status').textContent = '🔴 正在聆听，说完后自动停止...';
+    };
+
+    recognition.onresult = (e) => {
+        let interim = '';
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                currentText += e.results[i][0].transcript;
+            } else {
+                interim = e.results[i][0].transcript;
+            }
+        }
+        const display = currentText + interim;
+        const el = document.getElementById('search-display');
+        if (display) {
+            el.innerHTML = '<span style="color:#1A1A1A">' + display + '</span>';
+        }
+    };
+
+    recognition.onend = () => {
+        stopMic();
+        if (currentText.trim()) {
+            // 把识别结果写入 URL query param，触发 Streamlit rerun
+            const url = new URL(window.location);
+            url.searchParams.set('q', currentText.trim());
+            window.location.href = url.toString();
+        }
+    };
+
+    recognition.onerror = (e) => {
+        document.getElementById('mic-status').textContent = '识别失败，请重试';
+        stopMic();
+    };
+
+    recognition.start();
+}
+
+function stopMic() {
+    isRecording = false;
+    if (recognition) recognition.stop();
+    document.getElementById('mic-btn').classList.remove('recording');
+    document.getElementById('mic-btn').textContent = '🎙️';
+    document.getElementById('mic-status').textContent = currentText ? '✅ 识别完成' : '';
+}
+
+// 初始化：读取 URL 中已有的 q 参数显示在搜索框
+window.addEventListener('load', () => {
+    const q = new URL(window.location).searchParams.get('q');
+    if (q) {
+        currentText = q;
+        const el = document.getElementById('search-display');
+        el.innerHTML = '<span style="color:#1A1A1A">' + q + '</span>';
+        document.getElementById('mic-status').textContent = '✅ 已识别：' + q;
+    }
+});
+</script>
+""", unsafe_allow_html=True)
+
+st.markdown('<div class="search-hint">描述越具体，推荐越准确 · 点击 🎙️ 开麦语音输入（需 Chrome）</div>', unsafe_allow_html=True)
+
+# 读取文字输入（隐藏原生 input，用来接收语音回填）
+# 同时支持直接键盘输入
+user_query_typed = st.text_input(
     label="search",
-    placeholder="🔍  用大白话描述你想解决的问题...",
+    placeholder="或直接在此键入...",
     label_visibility="collapsed",
+    key="typed_query",
 )
-st.markdown('<div class="search-hint">描述越具体，推荐越准确 · 例如「给爷爷做会说话的电子贺卡」</div>', unsafe_allow_html=True)
+
+# 语音识别结果通过 URL query param 传入
+voice_query = st.query_params.get("q", "")
+user_query = user_query_typed.strip() or voice_query.strip()
 
 # ── 第三步：结果 ──
-if st.session_state.selected_modal or user_query.strip():
+if st.session_state.selected_modal or user_query:
     results = intent_recognition(user_query, st.session_state.selected_modal)
 
-    if user_query.strip():
+    if user_query:
         st.markdown(f'<div class="result-heading">根据「{user_query}」找到 {len(results)} 款工具</div>', unsafe_allow_html=True)
     else:
         st.markdown(f'<div class="result-heading">{st.session_state.selected_modal} 类工具 · 共 {len(results)} 款</div>', unsafe_allow_html=True)
