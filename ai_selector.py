@@ -22,93 +22,251 @@ from pathlib import Path
 # 页面配置
 # ──────────────────────────────────────────────
 st.set_page_config(
-    page_title="AI 好物筛选器",
-    page_icon="✨",
-    layout="wide",
-    initial_sidebar_state="expanded",
+    page_title="AI Selector",
+    page_icon="✦",
+    layout="centered",
+    initial_sidebar_state="collapsed",
 )
 
 # ──────────────────────────────────────────────
-# 全局样式（文科生审美：浅米色、衬线、宽松留白）
+# 全局样式 v3 — 图二风格：极简黑白、大字标题、手机优先
 # ──────────────────────────────────────────────
 st.markdown("""
 <style>
-html, body, [data-testid="stAppViewContainer"] {
-    background-color: #FAF8F4;
-    color: #2C2C2C;
-    font-family: 'Georgia', 'Palatino Linotype', serif;
-}
-[data-testid="stHeader"]  { background: #FAF8F4; }
-[data-testid="stSidebar"] { background: #FFFDF9; }
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@700;900&family=Noto+Sans+SC:wght@300;400;500&display=swap');
 
+/* ── 基础 ── */
+html, body, [data-testid="stAppViewContainer"], [data-testid="stMain"] {
+    background-color: #F7F5F0 !important;
+    color: #1A1A1A;
+    font-family: 'Noto Sans SC', 'PingFang SC', sans-serif;
+}
+[data-testid="stHeader"]         { background: transparent !important; }
+[data-testid="stSidebar"]        { background: #F7F5F0 !important; }
+[data-testid="stMainBlockContainer"] { max-width: 680px; padding: 0 16px; }
+section[data-testid="stMain"] > div { padding-top: 0; }
+
+/* 隐藏 Streamlit 默认装饰 */
+#MainMenu, footer, [data-testid="stToolbar"] { display: none !important; }
+[data-testid="stDecoration"] { display: none !important; }
+
+/* ── Hero 区 ── */
+.hero-eyebrow {
+    text-align: center;
+    font-size: 0.7rem; letter-spacing: 3px; font-weight: 500;
+    color: #1A1A1A; text-transform: uppercase;
+    background: #1A1A1A; color: #F7F5F0;
+    display: inline-block; padding: 4px 14px; border-radius: 20px;
+    margin: 2.5rem auto 1.2rem; display: block; width: fit-content;
+}
 .hero-title {
-    text-align: center; font-size: 2.6rem; font-weight: 700;
-    letter-spacing: -0.5px; color: #1A1A1A;
-    margin-top: 2rem; margin-bottom: 0.2rem; line-height: 1.2;
+    text-align: center;
+    font-family: 'Noto Serif SC', 'STSong', serif;
+    font-size: clamp(2.4rem, 8vw, 3.6rem);
+    font-weight: 900; line-height: 1.15;
+    color: #1A1A1A; letter-spacing: -1px;
+    margin: 0 0 1rem;
 }
 .hero-sub {
-    text-align: center; font-size: 1.05rem; color: #888;
-    margin-bottom: 2.5rem;
-    font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+    text-align: center; font-size: 0.92rem;
+    color: #888; line-height: 1.8;
+    margin-bottom: 2.8rem;
+    font-weight: 300;
 }
 
-.card {
-    background: #FFFFFF; border-radius: 20px;
-    padding: 26px 28px 22px; margin-bottom: 22px;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.06); border: 1px solid #EDE8DF;
-    transition: box-shadow 0.2s;
+/* ── 模态卡片 ── */
+.modal-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 2.4rem;
 }
-.card:hover { box-shadow: 0 6px 28px rgba(0,0,0,0.10); }
-.card-header { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
-.card-emoji  { font-size: 2.2rem; }
-.card-name   { font-size: 1.3rem; font-weight: 700; color: #1A1A1A; }
-.card-tagline{ font-size: 0.88rem; color: #999; font-family: 'PingFang SC', sans-serif; margin-top: 1px; }
-.card-desc   {
-    font-size: 0.95rem; color: #555; line-height: 1.75; margin-bottom: 16px;
-    font-family: 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+.modal-item {
+    background: #FFFFFF;
+    border: 1.5px solid #E8E4DC;
+    border-radius: 16px;
+    padding: 18px 8px 14px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    text-decoration: none;
+}
+.modal-item:hover {
+    border-color: #1A1A1A;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+}
+.modal-item.active {
+    background: #1A1A1A;
+    border-color: #1A1A1A;
+}
+.modal-item.active .modal-icon-svg { filter: invert(1); }
+.modal-item.active .modal-lbl { color: #FFFFFF; }
+.modal-icon-svg {
+    width: 28px; height: 28px;
+    opacity: 0.75;
+}
+.modal-lbl {
+    font-size: 0.78rem; color: #555;
+    font-weight: 500; letter-spacing: 0.3px;
 }
 
-.tag-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.tag { padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; font-family: 'PingFang SC', sans-serif; font-weight: 500; }
-.tag-easy     { background: #E8F5E9; color: #388E3C; }
-.tag-medium   { background: #FFF8E1; color: #F57F17; }
-.tag-hard     { background: #FCE4EC; color: #C62828; }
-.tag-free     { background: #E3F2FD; color: #1565C0; }
-.tag-paid     { background: #EDE7F6; color: #4527A0; }
-.tag-freemium { background: #E0F7FA; color: #00695C; }
-.tag-cn       { background: #E8F5E9; color: #2E7D32; }
-.tag-nocn     { background: #FFEBEE; color: #B71C1C; }
-.tag-partial  { background: #FFF3E0; color: #E65100; }
-
-.vote-bar-wrap { margin-bottom: 8px; }
-.vote-label { font-size: 0.78rem; color: #aaa; font-family: 'PingFang SC', sans-serif; margin-bottom: 5px; }
-.vote-track { height: 10px; border-radius: 6px; background: #F0EDE8; overflow: hidden; display: flex; }
-.vote-green { background: #81C784; border-radius: 6px 0 0 6px; }
-.vote-red   { background: #E57373; border-radius: 0 6px 6px 0; }
-.vote-pct   { display: flex; justify-content: space-between; font-size: 0.72rem; color: #bbb; margin-top: 3px; font-family: 'PingFang SC', sans-serif; }
-.vote-count { font-size: 0.72rem; color: #ccc; text-align: right; font-family: 'PingFang SC', sans-serif; margin-top: 2px; }
-
-.divider { border: none; border-top: 1px solid #EDE8DF; margin: 1.8rem 0; }
-
-.scenario-block { padding: 4px 0 8px; font-family: 'PingFang SC', sans-serif; }
-.scenario-good  { color: #2E7D32; font-weight: 600; margin-bottom: 6px; font-size: 0.95rem; }
-.scenario-bad   { color: #B71C1C; font-weight: 600; margin-bottom: 6px; font-size: 0.95rem; margin-top: 14px; }
-.scenario-item  { font-size: 0.88rem; color: #555; margin: 3px 0 3px 16px; line-height: 1.6; }
+/* ── 搜索框 ── */
+.search-wrap {
+    position: relative;
+    background: #FFFFFF;
+    border: 1.5px solid #E8E4DC;
+    border-radius: 50px;
+    display: flex; align-items: center;
+    padding: 0 20px;
+    margin-bottom: 0.5rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+}
+.search-wrap:focus-within {
+    border-color: #1A1A1A;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+/* 覆盖 Streamlit input 样式 */
+[data-testid="stTextInput"] input {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 1rem !important;
+    font-family: 'Noto Sans SC', sans-serif !important;
+    color: #1A1A1A !important;
+    padding: 16px 0 !important;
+}
+[data-testid="stTextInput"] > div > div {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+[data-testid="stTextInput"] { margin-bottom: 0 !important; }
 
 .search-hint {
-    text-align: center; font-size: 0.85rem; color: #BBB;
-    margin-top: -0.5rem; margin-bottom: 1.5rem;
-    font-family: 'PingFang SC', sans-serif;
+    text-align: center; font-size: 0.78rem; color: #C0BAB0;
+    margin-bottom: 2rem; font-weight: 300;
 }
+
+/* ── 产품 카드 ── */
+.card {
+    background: #FFFFFF;
+    border-radius: 20px;
+    padding: 24px 24px 18px;
+    margin-bottom: 16px;
+    border: 1.5px solid #ECEAE4;
+    transition: all 0.18s ease;
+}
+.card:hover {
+    border-color: #1A1A1A;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.08);
+    transform: translateY(-2px);
+}
+
+/* 产品顶部：封面色块 + 名称 */
+.card-top {
+    display: flex; align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 14px;
+}
+.card-avatar {
+    width: 52px; height: 52px; border-radius: 14px;
+    background: #F0EDE6;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; flex-shrink: 0;
+    border: 1px solid #E8E4DC;
+}
+.card-meta { flex: 1; padding-left: 14px; }
+.card-name {
+    font-size: 1.15rem; font-weight: 700;
+    color: #1A1A1A; line-height: 1.2;
+    margin-bottom: 3px;
+}
+.card-quote {
+    font-size: 0.82rem; color: #999;
+    font-style: italic; line-height: 1.5;
+}
+
+/* 描述 */
+.card-desc {
+    font-size: 0.9rem; color: #555; line-height: 1.8;
+    margin-bottom: 16px; font-weight: 300;
+}
+
+/* 标签 */
+.tag-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tag {
+    padding: 3px 12px; border-radius: 20px;
+    font-size: 0.72rem; font-weight: 500; letter-spacing: 0.2px;
+}
+.tag-easy     { background: #EDFAF1; color: #2D7A4F; border: 1px solid #C3EFCF; }
+.tag-medium   { background: #FFF9EC; color: #A0660A; border: 1px solid #FBDFA0; }
+.tag-hard     { background: #FEF0F0; color: #C0392B; border: 1px solid #F5C6C6; }
+.tag-free     { background: #EEF4FF; color: #2255CC; border: 1px solid #C5D8FF; }
+.tag-paid     { background: #F4F0FF; color: #6633CC; border: 1px solid #D6C5FF; }
+.tag-freemium { background: #EDFAFA; color: #0A7A7A; border: 1px solid #AADEDE; }
+.tag-cn       { background: #EDFAF1; color: #2D7A4F; border: 1px solid #C3EFCF; }
+.tag-nocn     { background: #FEF0F0; color: #C0392B; border: 1px solid #F5C6C6; }
+.tag-partial  { background: #FFF9EC; color: #A0660A; border: 1px solid #FBDFA0; }
+
+/* 投票条 */
+.vote-bar-wrap { margin-bottom: 6px; }
+.vote-label {
+    font-size: 0.72rem; color: #C0BAB0; margin-bottom: 6px;
+    display: flex; justify-content: space-between; align-items: center;
+}
+.vote-track {
+    height: 6px; border-radius: 6px;
+    background: #F0EDE8; overflow: hidden; display: flex;
+}
+.vote-green { background: #4CAF50; }
+.vote-red   { background: #EF5350; }
+.vote-pct   {
+    display: flex; justify-content: space-between;
+    font-size: 0.7rem; color: #C0BAB0; margin-top: 4px;
+}
+.vote-count { font-size: 0.68rem; color: #D0CCC4; text-align: right; margin-top: 2px; }
+
+/* 真香/避雷详情 */
+.scenario-block { padding: 4px 0 8px; }
+.scenario-good { color: #2D7A4F; font-weight: 600; margin-bottom: 6px; font-size: 0.88rem; }
+.scenario-bad  { color: #C0392B; font-weight: 600; margin-bottom: 6px; font-size: 0.88rem; margin-top: 14px; }
+.scenario-item { font-size: 0.84rem; color: #666; margin: 4px 0 4px 14px; line-height: 1.65; }
+
+/* 分割线 */
+.divider { border: none; border-top: 1px solid #ECEAE4; margin: 1.6rem 0; }
+
+/* 空状态 */
 .empty-state {
-    text-align: center; padding: 3rem 0; color: #BBB;
-    font-family: 'PingFang SC', sans-serif; font-size: 1rem;
+    text-align: center; padding: 4rem 0; color: #C0BAB0;
+    font-size: 0.95rem; line-height: 2;
 }
+
+/* 已投票 badge */
 .voted-badge {
-    display: inline-block; font-size: 0.7rem;
-    background: #F3F0EA; color: #B8874A;
-    border-radius: 10px; padding: 2px 10px;
-    font-family: 'PingFang SC', sans-serif; margin-left: 8px;
+    font-size: 0.65rem; background: #F0EDE6; color: #999;
+    border-radius: 8px; padding: 2px 8px; margin-left: 6px;
+    font-style: normal;
+}
+
+/* 结果小标题 */
+.result-heading {
+    font-size: 0.78rem; color: #AAA; letter-spacing: 1.5px;
+    text-transform: uppercase; font-weight: 500;
+    margin-bottom: 1.2rem; margin-top: 0.4rem;
+}
+
+/* ── 手机适配 ── */
+@media (max-width: 480px) {
+    .hero-title { font-size: 2rem; }
+    .modal-grid { grid-template-columns: repeat(5, 1fr); gap: 6px; }
+    .modal-item { padding: 12px 4px 10px; border-radius: 12px; }
+    .modal-icon-svg { width: 22px; height: 22px; }
+    .modal-lbl { font-size: 0.68rem; }
+    .card { padding: 18px 16px 14px; }
+    [data-testid="stMainBlockContainer"] { padding: 0 10px; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -437,33 +595,38 @@ def render_vote_bar(green: int, red: int, total: int) -> str:
     r_pct = 100 - g_pct
     return f"""
     <div class="vote-bar-wrap">
-        <div class="vote-label">用户口碑投票</div>
+        <div class="vote-label">
+            <span>红绿灯投票</span>
+            <span style="color:#D0CCC4;font-size:0.68rem;">{total} 票</span>
+        </div>
         <div class="vote-track">
             <div class="vote-green" style="width:{g_pct}%"></div>
             <div class="vote-red"   style="width:{r_pct}%"></div>
         </div>
-        <div class="vote-pct"><span>👍 {g_pct}% 真香</span><span>{r_pct}% 避雷 👎</span></div>
-        <div class="vote-count">共 {total} 票</div>
+        <div class="vote-pct"><span>👍 {g_pct}%</span><span>{r_pct}% 👎</span></div>
     </div>"""
 
 def render_scenario(p: dict) -> str:
-    good = "".join(f'<div class="scenario-item">✅ {x}</div>' for x in p["good"])
-    bad  = "".join(f'<div class="scenario-item">❌ {x}</div>' for x in p["bad"])
-    return f'<div class="scenario-block"><div class="scenario-good">✨ 真香：这些情况超好用</div>{good}<div class="scenario-bad">⚡ 避雷：这些情况别选它</div>{bad}</div>'
+    good = "".join(f'<div class="scenario-item">· {x}</div>' for x in p["good"])
+    bad  = "".join(f'<div class="scenario-item">· {x}</div>' for x in p["bad"])
+    return f'<div class="scenario-block"><div class="scenario-good">👍 真香：这些情况超好用</div>{good}<div class="scenario-bad">👎 避雷：这些情况别选它</div>{bad}</div>'
 
 def render_product_card(p: dict):
     pid = p["id"]
     green, red, total = get_vote_stats(pid)
     already_voted = pid in st.session_state.get("voted_products", set())
-    voted_badge = '<span class="voted-badge">✓ 已投票</span>' if already_voted else ""
+    voted_badge = '<span class="voted-badge">✓ 已投</span>' if already_voted else ""
+
+    # 引言句：取 tagline 的后半段作为卡片引语
+    quote = p["tagline"]
 
     st.markdown(f"""
     <div class="card">
-        <div class="card-header">
-            <span class="card-emoji">{p['emoji']}</span>
-            <div>
+        <div class="card-top">
+            <div class="card-avatar">{p['emoji']}</div>
+            <div class="card-meta">
                 <div class="card-name">{p['name']}{voted_badge}</div>
-                <div class="card-tagline">{p['tagline']}</div>
+                <div class="card-quote">"{quote}"</div>
             </div>
         </div>
         <div class="card-desc">{p['desc']}</div>
@@ -472,7 +635,7 @@ def render_product_card(p: dict):
     </div>""", unsafe_allow_html=True)
 
     if not already_voted:
-        vc1, vc2, vc3 = st.columns([1, 1, 4])
+        vc1, vc2, vc3 = st.columns([1, 1, 3])
         with vc1:
             if st.button("👍 真香", key=f"g_{pid}", use_container_width=True):
                 if cast_vote(pid, "green"):
@@ -482,12 +645,12 @@ def render_product_card(p: dict):
                 if cast_vote(pid, "red"):
                     st.rerun()
     else:
-        st.caption("✅ 感谢你的投票！结果已实时更新到排行榜")
+        st.caption("✅ 已记录，感谢投票")
 
-    with st.expander(f"📖 真香 vs 避雷 — {p['name']}"):
+    with st.expander(f"收起对比  ↕  {p['name']}"):
         st.markdown(render_scenario(p), unsafe_allow_html=True)
 
-    st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+    st.markdown("<div style='height:8px'></div>", unsafe_allow_html=True)
 
 
 # ──────────────────────────────────────────────
@@ -535,69 +698,117 @@ with st.sidebar:
 
 
 # ──────────────────────────────────────────────
-# 主页面
+# 主页面 — 图二风格布局
 # ──────────────────────────────────────────────
-st.markdown('<div class="hero-title">✨ AI 好物筛选器</div>', unsafe_allow_html=True)
-st.markdown('<div class="hero-sub">用大白话描述你的需求，找到最适合你的 AI 工具 · 收录 20 款产品</div>', unsafe_allow_html=True)
 
-# 第一步：模态选择
-MODALS = [("📝","文字"), ("🖼️","图片"), ("🎵","音频"), ("🎬","视频"), ("🌟","综合")]
-st.markdown("#### 第一步 · 选择你主要需要处理什么内容")
-cols = st.columns(5)
-for i, (icon, label) in enumerate(MODALS):
+# Hero
+st.markdown('<div class="hero-eyebrow">AI SELECTOR</div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-title">让 AI 选型回归直觉</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="hero-sub">不谈参数，不聊算力。只用大白话告诉你，<br>哪个 AI 才是你的「真香」选择。</div>',
+    unsafe_allow_html=True
+)
+
+# ── 第一步：模态卡片（纯 HTML，手机友好）──
+MODAL_ICONS = {
+    "文字": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M4 12h10M4 17h13"/></svg>""",
+    "图片": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>""",
+    "音频": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>""",
+    "视频": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="6" width="15" height="12" rx="2"/><path d="m17 10 5-3v10l-5-3"/></svg>""",
+    "综合": """<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="2" width="9" height="9" rx="1.5"/><rect x="13" y="2" width="9" height="9" rx="1.5"/><rect x="2" y="13" width="9" height="9" rx="1.5"/><rect x="13" y="13" width="9" height="9" rx="1.5"/></svg>""",
+}
+
+modal_items_html = ""
+for label, svg in MODAL_ICONS.items():
+    is_active = st.session_state.selected_modal == label
+    active_cls = "active" if is_active else ""
+    modal_items_html += f"""
+    <div class="modal-item {active_cls}" onclick="
+        var inputs = window.parent.document.querySelectorAll('input[type=text]');
+    ">
+        <div class="modal-icon-svg">{svg}</div>
+        <div class="modal-lbl">{label}</div>
+    </div>"""
+
+# 用 Streamlit 按钮实现点击（HTML 版仅视觉）
+cols = st.columns(5, gap="small")
+MODALS = list(MODAL_ICONS.keys())
+for i, label in enumerate(MODALS):
     with cols[i]:
         is_active = st.session_state.selected_modal == label
-        if st.button(f"{icon}\n\n{label}", key=f"modal_{label}",
-                     use_container_width=True,
-                     type="primary" if is_active else "secondary"):
+        svg = MODAL_ICONS[label]
+        btn_html = f"""
+        <div style="
+            background:{'#1A1A1A' if is_active else '#FFFFFF'};
+            border:1.5px solid {'#1A1A1A' if is_active else '#E8E4DC'};
+            border-radius:16px; padding:16px 6px 12px;
+            display:flex; flex-direction:column; align-items:center; gap:7px;
+            cursor:pointer; transition:all 0.15s;
+        ">
+            <div style="width:26px;height:26px;{'filter:invert(1);' if is_active else 'opacity:0.6;'}">{svg}</div>
+            <div style="font-size:0.75rem;color:{'#FFFFFF' if is_active else '#666'};font-weight:500;">{label}</div>
+        </div>"""
+        st.markdown(btn_html, unsafe_allow_html=True)
+        # 隐藏原生按钮文字，只用来捕获点击
+        if st.button("　", key=f"modal_{label}", use_container_width=True,
+                     help=f"筛选{label}类 AI 工具"):
             st.session_state.selected_modal = label if not is_active else None
             st.rerun()
 
+# 隐藏原生按钮的视觉，只保留点击区域
+st.markdown("""
+<style>
+/* 把每个模态列的原生按钮叠在 HTML card 上，透明不可见 */
+div[data-testid="column"] button {
+    position: relative; margin-top: -70px;
+    opacity: 0; height: 70px; width: 100%;
+    cursor: pointer !important;
+}
+</style>""", unsafe_allow_html=True)
+
 if st.session_state.selected_modal:
-    st.success(f"已选择：**{st.session_state.selected_modal}** 类 · 可继续描述需求，或直接查看推荐结果 👇")
+    st.markdown(
+        f'<div style="text-align:center;font-size:0.8rem;color:#888;margin:8px 0 16px;">'
+        f'已选择 · <b>{st.session_state.selected_modal}</b> · 可继续描述，或直接查看推荐</div>',
+        unsafe_allow_html=True
+    )
 
-st.markdown("<hr class='divider'>", unsafe_allow_html=True)
+st.markdown("<div style='height:20px'></div>", unsafe_allow_html=True)
 
-# 第二步：自然语言输入
-st.markdown("#### 第二步 · 用大白话告诉我你想做什么（可选）")
+# ── 第二步：搜索框 ──
 user_query = st.text_input(
-    label="需求描述",
-    placeholder="例如：我想给爷爷奶奶做一张会说话的电子贺卡 / 自动整理每天的会议记录",
+    label="search",
+    placeholder="🔍  用大白话描述你想解决的问题...",
     label_visibility="collapsed",
 )
-st.markdown('<div class="search-hint">💡 描述越具体，推荐越准确 · 支持口语化表达</div>', unsafe_allow_html=True)
+st.markdown('<div class="search-hint">描述越具体，推荐越准确 · 例如「给爷爷做会说话的电子贺卡」</div>', unsafe_allow_html=True)
 
-# 第三步：结果
+# ── 第三步：结果 ──
 if st.session_state.selected_modal or user_query.strip():
     results = intent_recognition(user_query, st.session_state.selected_modal)
-    st.markdown("<hr class='divider'>", unsafe_allow_html=True)
 
     if user_query.strip():
-        st.markdown(f"#### 根据「{user_query}」找到 **{len(results)}** 款工具 👇")
+        st.markdown(f'<div class="result-heading">根据「{user_query}」找到 {len(results)} 款工具</div>', unsafe_allow_html=True)
     else:
-        st.markdown(f"#### {st.session_state.selected_modal} 类工具推荐（共 **{len(results)}** 款）👇")
+        st.markdown(f'<div class="result-heading">{st.session_state.selected_modal} 类工具 · 共 {len(results)} 款</div>', unsafe_allow_html=True)
 
     if not results:
-        st.markdown('<div class="empty-state">暂时没有找到完全匹配的工具，试着换个描述方式？</div>', unsafe_allow_html=True)
+        st.markdown('<div class="empty-state">暂未找到匹配工具<br>换个描述方式试试？</div>', unsafe_allow_html=True)
     else:
-        col1, col2 = st.columns(2, gap="large")
-        for idx, p in enumerate(results):
-            with (col1 if idx % 2 == 0 else col2):
-                render_product_card(p)
+        for p in results:
+            render_product_card(p)
 else:
     st.markdown("""
     <div class="empty-state">
-        👆 请先在上方选择一个内容类型，或直接描述你的需求<br>
-        <span style="font-size:0.8rem;margin-top:8px;display:block;">
-        例如点击「图片」，或输入「帮我做电子贺卡」
-        </span>
+        点击上方类型卡片<br>
+        或直接描述你的需求<br>
+        <span style="font-size:0.78rem;color:#D0CCC4;">例如：帮我做电子贺卡 / 会议自动记录</span>
     </div>""", unsafe_allow_html=True)
 
 # 页脚
-st.markdown("<br>", unsafe_allow_html=True)
 st.markdown(
-    "<center style='color:#CCC;font-size:0.8rem;font-family:sans-serif;'>"
-    "AI 好物筛选器 v2.0 · 收录 20 款 AI 工具 · 投票数据持久化至 votes.json · 仅供参考"
-    "</center>",
+    "<div style='text-align:center;color:#D0CCC4;font-size:0.72rem;padding:2rem 0 1rem;'>"
+    "AI Selector · 收录 20 款工具 · 仅供参考"
+    "</div>",
     unsafe_allow_html=True,
 )
